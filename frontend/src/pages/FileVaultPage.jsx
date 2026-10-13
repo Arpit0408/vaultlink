@@ -54,7 +54,22 @@ const FileVaultPage = () => {
 
   const handleFileSelect = (e) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      const mime = file.type;
+      const isAllowed =
+        mime === "application/pdf" ||
+        mime.startsWith("image/") ||
+        ["pdf", "png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext);
+
+      if (!isAllowed) {
+        setUploadError("Only PDF and Image files (PNG, JPG, WEBP, GIF, SVG) are supported for secure viewing.");
+        setSelectedFile(null);
+        e.target.value = "";
+        return;
+      }
+
+      setSelectedFile(file);
       setUploadError(null);
       setUploadSuccess(false);
     }
@@ -80,7 +95,12 @@ const FileVaultPage = () => {
       setTimeout(() => setUploadSuccess(false), 3000);
       fetchFiles();
     } catch (err) {
-      setUploadError(err?.response?.data?.error || err.message || "Failed to upload file");
+      setUploadError(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err.message ||
+        "Failed to upload file"
+      );
     } finally {
       setIsUploading(false);
     }
@@ -213,21 +233,26 @@ const FileVaultPage = () => {
               <label className="flex flex-col items-center justify-center border-2 border-dashed border-vault-subtle rounded-2xl p-6 hover:border-indigo-500/60 bg-vault-primary/40 cursor-pointer transition-colors">
                 <Upload className="w-8 h-8 text-indigo-500 mb-2" />
                 <span className="text-xs font-bold text-vault-main">
-                  {selectedFile ? selectedFile.name : "Click to select or drag and drop any file"}
+                  {selectedFile ? selectedFile.name : "Click to select or drag and drop PDF or Image"}
                 </span>
                 <span className="text-[11px] text-vault-muted mt-1">
                   {selectedFile
                     ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`
-                    : "PDFs, Documents, PNGs, JPEGs up to 50MB"}
+                    : "Supports PDF, PNG, JPG, WEBP, GIF, SVG (Up to 50MB)"}
                 </span>
-                <input type="file" onChange={handleFileSelect} className="hidden" />
+                <input
+                  type="file"
+                  accept="application/pdf,image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
               </label>
             </div>
 
             <div className="space-y-3 flex flex-col justify-between">
               <div>
                 <label className="block text-xs font-bold text-vault-muted uppercase tracking-wider mb-1">
-                  Watermark Overlay Text
+                  Watermark (Optional)
                 </label>
                 <input
                   type="text"

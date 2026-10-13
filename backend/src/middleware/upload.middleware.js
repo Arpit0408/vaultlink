@@ -1,6 +1,7 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { BadRequestError } from "../utils/appError.js";
 
 const uploadDir = path.resolve("uploads");
 const originalDir = path.resolve("uploads/originals");
@@ -33,7 +34,7 @@ export const upload = multer({
     if (isAllowedExt || isAllowedMime) {
       cb(null, true);
     } else {
-      cb(new Error("Only PDF and Image files are permitted for secure vault storage"), false);
+      cb(new BadRequestError("Only PDF and Image files are permitted for secure vault storage"), false);
     }
   },
 });

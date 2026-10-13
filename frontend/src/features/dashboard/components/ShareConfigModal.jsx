@@ -52,7 +52,12 @@ const ShareConfigModal = ({ asset, isOpen, onClose, onSuccess }) => {
       setResult(res);
       if (onSuccess) onSuccess();
     } catch (err) {
-      setError(err?.response?.data?.error || err.message || "Failed to configure share");
+      setError(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err.message ||
+        "Failed to configure share"
+      );
     } finally {
       setLoading(false);
     }
