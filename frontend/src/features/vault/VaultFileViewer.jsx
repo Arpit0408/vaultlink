@@ -122,11 +122,28 @@ const VaultFileViewer = ({
       if (
         e.key === "PrintScreen" ||
         e.keyCode === 44 ||
-        (isCmdOrCtrl && e.shiftKey && (e.key === "s" || e.key === "S"))
+        e.code === "PrintScreen" ||
+        (isCmdOrCtrl && e.shiftKey && (e.key === "s" || e.key === "S")) ||
+        (e.metaKey && e.shiftKey && ["3", "4", "5", "s", "S"].includes(e.key))
       ) {
         e.preventDefault();
         setIsWhiteoutActive(true);
-        setTimeout(() => setIsWhiteoutActive(false), 2500);
+        setTimeout(() => setIsWhiteoutActive(false), 3000);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText("").catch(() => {});
+        }
+        triggerSecurityAlert("Screenshots are restricted by vault security policy.");
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      if (
+        e.key === "PrintScreen" ||
+        e.keyCode === 44 ||
+        e.code === "PrintScreen"
+      ) {
+        setIsWhiteoutActive(true);
+        setTimeout(() => setIsWhiteoutActive(false), 3000);
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText("").catch(() => {});
         }
@@ -147,6 +164,7 @@ const VaultFileViewer = ({
     window.addEventListener("focus", handleWindowFocus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
     window.addEventListener("dragstart", handleDragStart);
     window.addEventListener("selectstart", handleSelectStart);
 
@@ -156,6 +174,7 @@ const VaultFileViewer = ({
       window.removeEventListener("focus", handleWindowFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("dragstart", handleDragStart);
       window.removeEventListener("selectstart", handleSelectStart);
     };
