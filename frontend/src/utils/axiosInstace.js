@@ -5,7 +5,7 @@ const getBaseUrl = () => {
   if (typeof window !== "undefined" && window.location.hostname === "localhost") {
     return "http://localhost:2300";
   }
-  return "";
+  return "https://vaultlink-1b13.onrender.com";
 };
 
 const axiosInstance = axios.create({

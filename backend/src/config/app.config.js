@@ -1,4 +1,6 @@
-const isHttpsProd = process.env.NODE_ENV === "production" && process.env.APP_URL?.startsWith("https");
+const isHttpsProd =
+  process.env.NODE_ENV === "production" &&
+  process.env.APP_URL?.startsWith("https");
 
 export const cookieOptions = {
   httpOnly: true,
@@ -7,8 +9,13 @@ export const cookieOptions = {
   maxAge: 1000 * 60 * 60 * 24 * 7,
 };
 
+const configuredAppUrl = process.env.APP_URL
+  ? process.env.APP_URL.replace(/\/+$/, "")
+  : null;
+
 export const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:2300",
-  "https://urlshortner-nu-ten.vercel.app",
+  "https://vaultlink-omega.vercel.app",
+  ...(configuredAppUrl ? [configuredAppUrl] : []),
 ];
