@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Link2,
+  FileText,
   Copy,
   CheckCircle2,
   ExternalLink,
@@ -33,8 +34,10 @@ const AllUrls = () => {
     try {
       setLoading(true);
       const data = await getUserVaultAssets();
-      const urlsOnly = (Array.isArray(data) ? data : []).filter((item) => item.type === "url");
-      setLinks(urlsOnly);
+      const activeLinks = (Array.isArray(data) ? data : []).filter(
+        (item) => item.type === "url" || item.isShared !== false
+      );
+      setLinks(activeLinks);
     } catch (err) {
       console.error(err);
     } finally {
@@ -109,7 +112,8 @@ const AllUrls = () => {
     const query = searchTerm.toLowerCase();
     const full = (item.full || "").toLowerCase();
     const short = (item.short || "").toLowerCase();
-    return full.includes(query) || short.includes(query);
+    const fileName = (item.file?.originalName || "").toLowerCase();
+    return full.includes(query) || short.includes(query) || fileName.includes(query);
   });
 
   return (
@@ -291,15 +295,21 @@ const AllUrls = () => {
                       <tr key={item._id} className="hover:bg-vault-primary/30 transition-colors">
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0">
-                              <Link2 className="w-4 h-4" />
+                            <div
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                item.type === "file"
+                                  ? "bg-indigo-500/10 text-indigo-500"
+                                  : "bg-purple-500/10 text-purple-500"
+                              }`}
+                            >
+                              {item.type === "file" ? <FileText className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
                             </div>
                             <div className="flex flex-col min-w-0 max-w-[280px]">
                               <span className="font-heading font-bold text-vault-main truncate text-xs">
-                                {item.full}
+                                {item.type === "file" ? (item.file?.originalName || "Shared File") : item.full}
                               </span>
                               <span className="text-[10px] text-vault-muted font-mono truncate">
-                                Created {new Date(item.createdAt).toLocaleDateString()}
+                                {item.type === "file" ? "Shared File • " : ""}Created {new Date(item.createdAt).toLocaleDateString()}
                               </span>
                             </div>
                           </div>

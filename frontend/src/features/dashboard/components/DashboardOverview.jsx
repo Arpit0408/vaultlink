@@ -55,7 +55,7 @@ const DashboardOverview = () => {
 
   const totalClicks = assets.reduce((acc, curr) => acc + (curr.clicks || 0), 0);
   const totalFiles = assets.filter((a) => a.type === "file").length;
-  const totalUrls = assets.filter((a) => a.type === "url").length;
+  const totalUrls = assets.filter((a) => a.type === "url" || a.isShared !== false).length;
   const totalWatermarked = assets.filter((a) => a.isWatermarked).length;
 
   return (
@@ -223,13 +223,13 @@ const DashboardOverview = () => {
             onClick={() => navigate({ to: "/dashboard/allurls" })}
             className="text-xs font-bold text-purple-500 hover:text-purple-600 transition-colors flex items-center gap-1 cursor-pointer"
           >
-            <span>Manage All Links ({assets.filter((a) => a.type === "url").length})</span>
+            <span>Manage All Links ({assets.filter((a) => a.type === "url" || a.isShared !== false).length})</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <VaultAssetsList
-          assets={assets.filter((a) => a.type === "url")}
+          assets={assets.filter((a) => a.type === "url" || a.isShared !== false)}
           mode="url"
           loading={loading}
           onDeleteAsset={handleDelete}

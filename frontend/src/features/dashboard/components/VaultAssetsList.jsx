@@ -43,9 +43,9 @@ const VaultAssetsList = ({
 
   const scopedAssets = assets.filter((item) => {
     if (isFileMode) return item.type === "file";
-    if (isUrlMode) return item.type === "url";
+    if (isUrlMode) return item.type === "url" || item.isShared !== false;
     if (activeFilter === "file") return item.type === "file";
-    if (activeFilter === "url") return item.type === "url";
+    if (activeFilter === "url") return item.type === "url" || item.isShared !== false;
     return true;
   });
 
@@ -68,11 +68,11 @@ const VaultAssetsList = ({
   });
 
   const fileCount = assets.filter((a) => a.type === "file").length;
-  const urlCount = assets.filter((a) => a.type === "url").length;
+  const urlCount = assets.filter((a) => a.type === "url" || a.isShared !== false).length;
   const watermarkedCount = assets.filter((a) => a.type === "file" && a.isWatermarked).length;
   const privateFileCount = assets.filter((a) => a.type === "file" && a.isShared === false).length;
-  const passwordProtectedCount = assets.filter((a) => a.type === "url" && a.isPasswordProtected).length;
-  const expiringUrlCount = assets.filter((a) => a.type === "url" && a.expiresAt).length;
+  const passwordProtectedCount = assets.filter((a) => (a.type === "url" || a.isShared !== false) && a.isPasswordProtected).length;
+  const expiringUrlCount = assets.filter((a) => (a.type === "url" || a.isShared !== false) && a.expiresAt).length;
 
   return (
     <div className="space-y-4">
@@ -222,14 +222,14 @@ const VaultAssetsList = ({
               <thead className="bg-vault-primary/60 border-b border-vault-subtle text-vault-muted font-heading uppercase text-[11px] tracking-wider">
                 <tr>
                   <th className="py-3 px-4 font-bold">
-                    {isFileMode ? "File Asset" : isUrlMode ? "Destination URL" : "Asset / Target"}
+                    {isFileMode ? "File Asset" : isUrlMode ? "Asset / Destination" : "Asset / Target"}
                   </th>
                   <th className="py-3 px-4 font-bold">
                     {isFileMode ? "Vault Link" : "Short Code"}
                   </th>
                   <th className="py-3 px-4 font-bold">Security Policies</th>
                   <th className="py-3 px-4 font-bold text-center">
-                    {isFileMode ? "Views" : "Clicks"}
+                    {isFileMode ? "Views" : "Clicks / Views"}
                   </th>
                   <th className="py-3 px-4 font-bold text-right">Actions</th>
                 </tr>
