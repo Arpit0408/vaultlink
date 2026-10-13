@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   FileText,
   Download,
@@ -9,12 +9,12 @@ import {
   Minimize2,
   ZoomIn,
   ZoomOut,
-  RefreshCw,
-  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
   Lock,
-  FileCheck2,
-  AlertCircle,
-  Play,
+  AlertTriangle,
+  Loader2,
+  Image as ImageIcon,
 } from "lucide-react";
 
 const VaultFileViewer = ({
@@ -24,8 +24,15 @@ const VaultFileViewer = ({
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [activeOfficeProvider, setActiveOfficeProvider] = useState("microsoft");
-  const [iframeError, setIframeError] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [numPages, setNumPages] = useState(0);
+  const [pdfLoading, setPdfLoading] = useState(true);
+  const [pdfError, setPdfError] = useState(null);
+  const [securityNotice, setSecurityNotice] = useState(null);
+  const [screenBlurred, setScreenBlurred] = useState(false);
+
+  const canvasRef = useRef(null);
+  const pdfDocRef = useRef(null);
 
   const fileName = fileData?.fileName || "Protected Asset";
   const ext = fileName.split(".").pop()?.toLowerCase() || "";
@@ -45,32 +52,195 @@ const VaultFileViewer = ({
   const isImage =
     ["png", "jpg", "jpeg", "webp", "gif", "svg", "bmp"].includes(ext) ||
     mime.startsWith("image/");
-  const isVideo =
-    ["mp4", "webm", "ogg", "mov", "m4v"].includes(ext) ||
-    mime.startsWith("video/");
-  const isAudio =
-    ["mp3", "wav", "ogg", "m4a", "aac"].includes(ext) ||
-    mime.startsWith("audio/");
   const isPdf = ext === "pdf" || mime.includes("pdf");
-  const isOffice = ["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext);
-  const isText = ["txt", "csv", "json", "md", "xml", "log", "js", "html"].includes(ext);
-
-  const msOfficeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(
-    resolvedFileUrl
-  )}`;
-  const googleDocsUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(
-    resolvedFileUrl
-  )}&embedded=true`;
-
-  const handlePreventContext = (e) => {
-    if (!allowDownload) {
-      e.preventDefault();
-    }
-  };
 
   const watermarkStamp = `${watermarkText}${
     viewerEmail ? ` • ${viewerEmail}` : ""
   } • ${new Date().toLocaleDateString()}`;
+
+  const triggerSecurityAlert = (msg) => {
+    setSecurityNotice(msg);
+    setTimeout(() => setSecurityNotice(null), 3000);
+  };
+
+  useEffect(() => {
+    if (allowDownload) return;
+
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+      triggerSecurityAlert("Right-click context menu is restricted on this protected file.");
+    };
+
+    const handleKeyDown = (e) => {
+      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+
+      if (isCmdOrCtrl && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerSecurityAlert("Saving this protected document is restricted.");
+      }
+
+      if (isCmdOrCtrl && (e.key === "p" || e.key === "P")) {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerSecurityAlert("Printing this protected document is restricted.");
+      }
+
+      if (isCmdOrCtrl && (e.key === "c" || e.key === "C")) {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerSecurityAlert("Copying content is disabled.");
+      }
+
+      if (isCmdOrCtrl && (e.key === "u" || e.key === "U")) {
+        e.preventDefault();
+      }
+
+      if (
+        e.key === "F12" ||
+        (isCmdOrCtrl && e.shiftKey && ["I", "i", "J", "j", "C", "c"].includes(e.key))
+      ) {
+        e.preventDefault();
+      }
+
+      if (e.key === "PrintScreen") {
+        setScreenBlurred(true);
+        setTimeout(() => setScreenBlurred(false), 1200);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText("").catch(() => {});
+        }
+        triggerSecurityAlert("Screenshots are restricted by vault security policy.");
+      }
+    };
+
+    const handleDragStart = (e) => {
+      e.preventDefault();
+    };
+
+    const handleSelectStart = (e) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("dragstart", handleDragStart);
+    window.addEventListener("selectstart", handleSelectStart);
+
+    return () => {
+      window.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("dragstart", handleDragStart);
+      window.removeEventListener("selectstart", handleSelectStart);
+    };
+  }, [allowDownload]);
+
+  useEffect(() => {
+    if (!isPdf || !resolvedFileUrl) return;
+
+    let isCancelled = false;
+
+    const loadPdfJsScript = () => {
+      return new Promise((resolve, reject) => {
+        if (window.pdfjsLib) {
+          return resolve(window.pdfjsLib);
+        }
+        const existingScript = document.getElementById("pdfjs-lib-cdn");
+        if (existingScript) {
+          existingScript.addEventListener("load", () => resolve(window.pdfjsLib));
+          existingScript.addEventListener("error", reject);
+          return;
+        }
+        const script = document.createElement("script");
+        script.id = "pdfjs-lib-cdn";
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+        script.async = true;
+        script.onload = () => {
+          if (window.pdfjsLib) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+              "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+            resolve(window.pdfjsLib);
+          } else {
+            reject(new Error("pdfjsLib not defined"));
+          }
+        };
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    };
+
+    setPdfLoading(true);
+    setPdfError(null);
+
+    loadPdfJsScript()
+      .then((pdfjs) => {
+        const loadingTask = pdfjs.getDocument({
+          url: resolvedFileUrl,
+          withCredentials: false,
+        });
+        return loadingTask.promise;
+      })
+      .then((doc) => {
+        if (isCancelled) return;
+        pdfDocRef.current = doc;
+        setNumPages(doc.numPages);
+        setCurrentPage(1);
+        setPdfLoading(false);
+      })
+      .catch((err) => {
+        if (isCancelled) return;
+        setPdfError(err.message || "Failed to render PDF in canvas mode");
+        setPdfLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isPdf, resolvedFileUrl]);
+
+  useEffect(() => {
+    if (!isPdf || !pdfDocRef.current || !canvasRef.current) return;
+
+    let isRenderCancelled = false;
+
+    pdfDocRef.current
+      .getPage(currentPage)
+      .then((page) => {
+        if (isRenderCancelled) return;
+
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+
+        const unscaledViewport = page.getViewport({ scale: 1 });
+        const targetWidth = Math.min(window.innerWidth * 0.85, 900) * zoomLevel;
+        const scale = targetWidth / unscaledViewport.width;
+        const viewport = page.getViewport({ scale });
+
+        const outputScale = window.devicePixelRatio || 1;
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+        canvas.style.width = Math.floor(viewport.width) + "px";
+        canvas.style.height = Math.floor(viewport.height) + "px";
+
+        ctx.setTransform(outputScale, 0, 0, outputScale, 0, 0);
+
+        const renderContext = {
+          canvasContext: ctx,
+          viewport: viewport,
+        };
+
+        return page.render(renderContext).promise;
+      })
+      .catch((err) => {
+        if (!isRenderCancelled) {
+          console.error("PDF render error:", err);
+        }
+      });
+
+    return () => {
+      isRenderCancelled = true;
+    };
+  }, [isPdf, currentPage, zoomLevel]);
 
   const renderWatermarkOverlay = () => {
     if (!isWatermarked) return null;
@@ -95,59 +265,97 @@ const VaultFileViewer = ({
     );
   };
 
+  const handlePreventContext = (e) => {
+    if (!allowDownload) {
+      e.preventDefault();
+      triggerSecurityAlert("Right-click context menu is restricted.");
+    }
+  };
+
   return (
-    <div
-      className={`flex flex-col rounded-3xl border border-vault-subtle bg-vault-card shadow-2xl overflow-hidden transition-all duration-300 ${
-        isFullscreen
-          ? "fixed inset-0 z-50 rounded-none w-screen h-screen bg-vault-primary"
-          : "w-full max-w-5xl mx-auto"
-      }`}
-      onContextMenu={handlePreventContext}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-vault-subtle bg-vault-card/95 backdrop-blur-md">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 flex items-center justify-center shrink-0">
-            <FileText className="w-5 h-5" />
+    <>
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          body::before {
+            content: "CONFIDENTIAL ASSET • PRINTING RESTRICTED BY VAULTLINK GOVERNANCE";
+            visibility: visible !important;
+            display: block !important;
+            font-size: 20pt;
+            font-weight: bold;
+            color: #ef4444;
+            text-align: center;
+            margin-top: 150px;
+          }
+        }
+      `}</style>
+
+      <div
+        className={`flex flex-col rounded-3xl border border-vault-subtle bg-vault-card shadow-2xl overflow-hidden transition-all duration-300 select-none ${
+          isFullscreen
+            ? "fixed inset-0 z-50 rounded-none w-screen h-screen bg-vault-primary"
+            : "w-full max-w-5xl mx-auto"
+        } ${screenBlurred ? "blur-2xl opacity-10 pointer-events-none" : ""}`}
+        onContextMenu={handlePreventContext}
+        style={{
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+        }}
+      >
+        {securityNotice && (
+          <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-bold flex items-center justify-center gap-2 shadow-md z-30 animate-pulse">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{securityNotice}</span>
           </div>
-          <div className="min-w-0">
-            <h2 className="font-heading font-extrabold text-sm sm:text-base text-vault-main truncate max-w-xs sm:max-w-md">
-              {fileName}
-            </h2>
-            <div className="flex items-center gap-2 text-[11px] text-vault-muted font-mono mt-0.5">
-              <span>{ext.toUpperCase()}</span>
-              {fileData?.size ? (
-                <>
-                  <span>•</span>
-                  <span>{(fileData.size / 1024 / 1024).toFixed(2)} MB</span>
-                </>
-              ) : null}
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-vault-subtle bg-vault-card/95 backdrop-blur-md">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 flex items-center justify-center shrink-0">
+              {isImage ? <ImageIcon className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-heading font-extrabold text-sm sm:text-base text-vault-main truncate max-w-xs sm:max-w-md">
+                {fileName}
+              </h2>
+              <div className="flex items-center gap-2 text-[11px] text-vault-muted font-mono mt-0.5">
+                <span>{ext.toUpperCase()}</span>
+                {fileData?.size ? (
+                  <>
+                    <span>•</span>
+                    <span>{(fileData.size / 1024 / 1024).toFixed(2)} MB</span>
+                  </>
+                ) : null}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          {!allowDownload ? (
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-              <EyeOff className="w-3.5 h-3.5" />
-              <span>View Only</span>
-            </span>
-          ) : (
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-              <Eye className="w-3.5 h-3.5" />
-              <span>Verified Preview</span>
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {!allowDownload ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                <EyeOff className="w-3.5 h-3.5" />
+                <span>View Only</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                <Eye className="w-3.5 h-3.5" />
+                <span>Verified Preview</span>
+              </span>
+            )}
 
-          {isWatermarked && (
-            <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
-              <Shield className="w-3 h-3" />
-              <span>Watermarked</span>
-            </span>
-          )}
+            {isWatermarked && (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                <Shield className="w-3 h-3" />
+                <span>Watermarked</span>
+              </span>
+            )}
 
-          {isImage && (
-            <div className="hidden sm:flex items-center border border-vault-subtle rounded-xl p-0.5 bg-vault-primary">
+            <div className="flex items-center border border-vault-subtle rounded-xl p-0.5 bg-vault-primary">
               <button
+                type="button"
                 onClick={() => setZoomLevel((prev) => Math.max(0.5, prev - 0.25))}
                 className="p-1.5 rounded-lg text-vault-muted hover:text-vault-main cursor-pointer"
                 title="Zoom Out"
@@ -158,6 +366,7 @@ const VaultFileViewer = ({
                 {Math.round(zoomLevel * 100)}%
               </span>
               <button
+                type="button"
                 onClick={() => setZoomLevel((prev) => Math.min(2.5, prev + 0.25))}
                 className="p-1.5 rounded-lg text-vault-muted hover:text-vault-main cursor-pointer"
                 title="Zoom In"
@@ -165,198 +374,170 @@ const VaultFileViewer = ({
                 <ZoomIn className="w-4 h-4" />
               </button>
             </div>
-          )}
 
-          <button
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-2 rounded-xl border border-vault-subtle bg-vault-primary text-vault-muted hover:text-vault-main transition-colors cursor-pointer"
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen Viewer"}
-          >
-            {isFullscreen ? (
-              <Minimize2 className="w-4 h-4" />
-            ) : (
-              <Maximize2 className="w-4 h-4" />
-            )}
-          </button>
-
-          {allowDownload && (
-            <a
-              href={fileData?.downloadUrl || resolvedFileUrl}
-              download={fileName}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">Download</span>
-            </a>
-          )}
-        </div>
-      </div>
-
-      <div
-        className={`relative w-full overflow-hidden bg-slate-950 flex items-center justify-center select-none ${
-          isFullscreen ? "flex-1" : "min-h-[500px] max-h-[750px]"
-        }`}
-        style={{ userSelect: "none" }}
-      >
-        {renderWatermarkOverlay()}
-
-        {isImage && (
-          <div className="relative w-full h-full p-4 flex items-center justify-center overflow-auto">
-            <img
-              src={resolvedFileUrl}
-              alt={fileName}
-              draggable={false}
-              onContextMenu={handlePreventContext}
-              style={{
-                transform: `scale(${zoomLevel})`,
-                transition: "transform 0.15s ease-out",
-                maxHeight: isFullscreen ? "90vh" : "650px",
-              }}
-              className="object-contain rounded-xl shadow-2xl pointer-events-auto"
-            />
-          </div>
-        )}
-
-        {isVideo && (
-          <div className="relative w-full h-full flex items-center justify-center p-2 sm:p-4">
-            <video
-              src={resolvedFileUrl}
-              controls
-              playsInline
-              controlsList={!allowDownload ? "nodownload noplaybackrate" : undefined}
-              disablePictureInPicture={!allowDownload}
-              onContextMenu={handlePreventContext}
-              className="max-h-[650px] w-full rounded-2xl shadow-2xl object-contain bg-black z-10"
-            />
-          </div>
-        )}
-
-        {isAudio && (
-          <div className="w-full max-w-lg p-8 z-10 flex flex-col items-center gap-6 rounded-3xl bg-vault-card/90 border border-vault-subtle backdrop-blur-xl">
-            <div className="w-20 h-20 rounded-3xl bg-brand-deep text-white flex items-center justify-center shadow-xl shadow-indigo-500/25 animate-pulse">
-              <Play className="w-10 h-10 ml-1" />
-            </div>
-            <div className="text-center">
-              <h3 className="font-heading font-extrabold text-lg text-vault-main">
-                {fileName}
-              </h3>
-              <p className="text-xs text-vault-muted mt-1 font-mono">
-                Encrypted Audio Stream
-              </p>
-            </div>
-            <audio
-              src={resolvedFileUrl}
-              controls
-              controlsList={!allowDownload ? "nodownload" : undefined}
-              className="w-full"
-            />
-          </div>
-        )}
-
-        {isPdf && (
-          <div className="relative w-full h-full min-h-[600px] flex flex-col">
-            <iframe
-              src={`${resolvedFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-              title={fileName}
-              className="w-full h-full min-h-[600px] border-none"
-              onContextMenu={handlePreventContext}
-            />
-          </div>
-        )}
-
-        {isOffice && (
-          <div className="relative w-full h-full min-h-[600px] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800 text-xs text-slate-300 z-10">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">Office Viewer Provider:</span>
+            {isPdf && numPages > 1 && (
+              <div className="flex items-center border border-vault-subtle rounded-xl p-0.5 bg-vault-primary">
                 <button
-                  onClick={() => setActiveOfficeProvider("microsoft")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                    activeOfficeProvider === "microsoft"
-                      ? "bg-indigo-600 text-white"
-                      : "bg-slate-800 text-slate-400 hover:text-white"
-                  }`}
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="p-1.5 rounded-lg text-vault-muted hover:text-vault-main disabled:opacity-30 cursor-pointer"
+                  title="Previous Page"
                 >
-                  Microsoft 365
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
+                <span className="text-[11px] font-mono px-1.5 text-vault-main">
+                  {currentPage} / {numPages}
+                </span>
                 <button
-                  onClick={() => setActiveOfficeProvider("google")}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                    activeOfficeProvider === "google"
-                      ? "bg-indigo-600 text-white"
-                      : "bg-slate-800 text-slate-400 hover:text-white"
-                  }`}
+                  type="button"
+                  disabled={currentPage >= numPages}
+                  onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
+                  className="p-1.5 rounded-lg text-vault-muted hover:text-vault-main disabled:opacity-30 cursor-pointer"
+                  title="Next Page"
                 >
-                  Google Docs
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
+            )}
 
-              <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
-                Read-Only Governance Frame
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="p-2 rounded-xl border border-vault-subtle bg-vault-primary text-vault-muted hover:text-vault-main transition-colors cursor-pointer"
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen Viewer"}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-4 h-4" />
+              ) : (
+                <Maximize2 className="w-4 h-4" />
+              )}
+            </button>
 
-            <iframe
-              src={activeOfficeProvider === "microsoft" ? msOfficeUrl : googleDocsUrl}
-              title={fileName}
-              className="w-full h-full min-h-[600px] border-none bg-white"
-              sandbox="allow-scripts allow-same-origin allow-popups"
-            />
-          </div>
-        )}
-
-        {!isImage && !isVideo && !isAudio && !isPdf && !isOffice && (
-          <div className="w-full max-w-md p-8 z-10 flex flex-col items-center text-center gap-4 rounded-3xl bg-vault-card/90 border border-vault-subtle backdrop-blur-xl m-6">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
-              <FileCheck2 className="w-8 h-8" />
-            </div>
-            <div>
-              <h3 className="font-heading font-extrabold text-base text-vault-main">
-                {fileName}
-              </h3>
-              <p className="text-xs text-vault-muted mt-1">
-                Zero-Trust Secure Container Encrypted
-              </p>
-            </div>
-
-            {allowDownload ? (
+            {allowDownload && (
               <a
                 href={fileData?.downloadUrl || resolvedFileUrl}
                 download={fileName}
-                className="mt-2 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-deep text-white text-xs font-semibold shadow-lg shadow-indigo-500/25 hover:opacity-95 cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
               >
                 <Download className="w-4 h-4" />
-                <span>Download Secure File</span>
+                <span className="hidden sm:inline">Download</span>
               </a>
-            ) : (
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-xl">
-                <Lock className="w-4 h-4" />
-                <span>Direct Download Restricted by Asset Policy</span>
-              </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
 
-      <div className="px-6 py-3 border-t border-vault-subtle bg-vault-card/90 flex flex-wrap items-center justify-between text-xs text-vault-muted gap-2">
-        <div className="flex items-center gap-2">
-          <Shield className="w-3.5 h-3.5 text-indigo-500" />
-          <span>Zero-Trust Vault Security Active</span>
-        </div>
-        <div className="flex items-center gap-4 text-[11px] font-mono">
-          {!allowDownload ? (
-            <span className="text-amber-500 font-bold">
-              Download Guard: Enforced
-            </span>
-          ) : (
-            <span className="text-emerald-500 font-bold">
-              Download Permitted
-            </span>
+        <div
+          className={`relative w-full overflow-auto bg-slate-950 flex items-center justify-center select-none ${
+            isFullscreen ? "flex-1 min-h-0" : "min-h-[500px] max-h-[750px]"
+          }`}
+          onContextMenu={handlePreventContext}
+        >
+          {renderWatermarkOverlay()}
+
+          {isImage && (
+            <div className="relative w-full h-full p-4 flex items-center justify-center overflow-auto">
+              <img
+                src={resolvedFileUrl}
+                alt={fileName}
+                draggable={false}
+                onContextMenu={handlePreventContext}
+                style={{
+                  transform: `scale(${zoomLevel})`,
+                  transition: "transform 0.15s ease-out",
+                  maxHeight: isFullscreen ? "90vh" : "650px",
+                }}
+                className="object-contain rounded-xl shadow-2xl pointer-events-auto select-none"
+              />
+            </div>
           )}
-          <span>Watermark: {isWatermarked ? "Stamped" : "None"}</span>
+
+          {isPdf && (
+            <div className="relative w-full h-full min-h-[550px] p-4 flex flex-col items-center justify-start overflow-auto">
+              {pdfLoading && (
+                <div className="py-24 flex flex-col items-center gap-3 text-vault-muted text-xs">
+                  <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                  <span>Loading PDF pages securely...</span>
+                </div>
+              )}
+
+              {pdfError ? (
+                <div className="relative w-full h-full min-h-[550px] flex flex-col">
+                  {!allowDownload && (
+                    <div
+                      className="absolute inset-0 z-20 cursor-default"
+                      onContextMenu={handlePreventContext}
+                    />
+                  )}
+                  <iframe
+                    src={`${resolvedFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                    title={fileName}
+                    className="w-full h-full min-h-[550px] border-none bg-white rounded-xl"
+                  />
+                </div>
+              ) : (
+                <canvas
+                  ref={canvasRef}
+                  onContextMenu={handlePreventContext}
+                  className="rounded-xl shadow-2xl border border-slate-800 bg-white select-none pointer-events-auto"
+                />
+              )}
+            </div>
+          )}
+
+          {!isImage && !isPdf && (
+            <div className="w-full max-w-md p-8 z-10 flex flex-col items-center text-center gap-4 rounded-3xl bg-vault-card/90 border border-vault-subtle backdrop-blur-xl m-6">
+              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                <FileText className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="font-heading font-extrabold text-base text-vault-main">
+                  {fileName}
+                </h3>
+                <p className="text-xs text-vault-muted mt-1">
+                  Protected Document Format
+                </p>
+              </div>
+
+              {allowDownload ? (
+                <a
+                  href={fileData?.downloadUrl || resolvedFileUrl}
+                  download={fileName}
+                  className="mt-2 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-deep text-white text-xs font-semibold shadow-lg shadow-indigo-500/25 hover:opacity-95 cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download Secure File</span>
+                </a>
+              ) : (
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-xl">
+                  <Lock className="w-4 h-4" />
+                  <span>Download Restricted by Asset Policy</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-3 border-t border-vault-subtle bg-vault-card/90 flex flex-wrap items-center justify-between text-xs text-vault-muted gap-2">
+          <div className="flex items-center gap-2">
+            <Shield className="w-3.5 h-3.5 text-indigo-500" />
+            <span>Zero-Trust Vault Security Active</span>
+          </div>
+          <div className="flex items-center gap-4 text-[11px] font-mono">
+            {!allowDownload ? (
+              <span className="text-amber-500 font-bold">
+                Anti-Leak Guard: Enforced
+              </span>
+            ) : (
+              <span className="text-emerald-500 font-bold">
+                Download Permitted
+              </span>
+            )}
+            <span>Watermark: {isWatermarked ? "Stamped" : "None"}</span>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -26,4 +26,14 @@ const storage = multer.diskStorage({
 export const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const isAllowedExt = [".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"].includes(ext);
+    const isAllowedMime = file.mimetype === "application/pdf" || file.mimetype.startsWith("image/");
+    if (isAllowedExt || isAllowedMime) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF and Image files are permitted for secure vault storage"), false);
+    }
+  },
 });

@@ -38,7 +38,21 @@ const CreateAssetModal = ({ isOpen, onClose, onSuccess }) => {
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selected = e.target.files[0];
+      const ext = selected.name.split(".").pop()?.toLowerCase();
+      const mime = selected.type;
+      const isAllowed =
+        mime === "application/pdf" ||
+        mime.startsWith("image/") ||
+        ["pdf", "png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext);
+
+      if (!isAllowed) {
+        setError("Only PDF and Image files (PNG, JPG, WEBP, GIF, SVG) are supported for secure viewing.");
+        setFile(null);
+        return;
+      }
+
+      setFile(selected);
       setError(null);
     }
   };
@@ -263,17 +277,22 @@ const CreateAssetModal = ({ isOpen, onClose, onSuccess }) => {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-vault-muted mb-1.5 uppercase tracking-wider">
-                      Select Asset (Image / PDF / Document)
+                      Select Asset (PDF or Image Only)
                     </label>
                     <label className="flex flex-col items-center justify-center border-2 border-dashed border-vault-subtle rounded-xl p-5 hover:border-indigo-500/50 bg-vault-primary/40 cursor-pointer transition-colors">
                       <Upload className="w-7 h-7 text-indigo-500 mb-2" />
                       <span className="text-xs font-bold text-vault-main">
-                        {file ? file.name : "Click to select or drag and drop file"}
+                        {file ? file.name : "Click to select or drag and drop PDF or Image"}
                       </span>
                       <span className="text-[11px] text-vault-muted mt-1">
-                        {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : "Up to 50MB with ImageKit Cloud Storage"}
+                        {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : "Supports PDF, PNG, JPG, WEBP, GIF, SVG (Up to 50MB)"}
                       </span>
-                      <input type="file" onChange={handleFileChange} className="hidden" />
+                      <input
+                        type="file"
+                        accept="application/pdf,image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
                     </label>
                   </div>
 
