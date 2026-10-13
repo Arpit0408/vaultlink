@@ -68,6 +68,10 @@ const vaultItemSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    allowDownload: {
+      type: Boolean,
+      default: true,
+    },
     clicks: {
       type: Number,
       required: true,

@@ -11,6 +11,8 @@ import {
   ExternalLink,
   Clock,
   AlertCircle,
+  Download,
+  EyeOff,
 } from "lucide-react";
 import { configureShareAsset } from "../../../apis/vaultApi.js";
 import NaturalExpiryInput from "./NaturalExpiryInput.jsx";
@@ -20,6 +22,10 @@ const ShareConfigModal = ({ asset, isOpen, onClose, onSuccess }) => {
   const [expiresInMinutes, setExpiresInMinutes] = useState("");
   const [requireEmail, setRequireEmail] = useState(Boolean(asset?.requireEmail));
   const [recipientEmail, setRecipientEmail] = useState(asset?.recipientEmail || "");
+  const [allowDownload, setAllowDownload] = useState(
+    asset?.allowDownload !== undefined ? Boolean(asset.allowDownload) : true
+  );
+  const [watermarkText, setWatermarkText] = useState(asset?.watermarkText || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -38,6 +44,8 @@ const ShareConfigModal = ({ asset, isOpen, onClose, onSuccess }) => {
         expiresInMinutes: expiresInMinutes ? String(expiresInMinutes) : "",
         requireEmail: Boolean(requireEmail),
         recipientEmail: recipientEmail.trim(),
+        allowDownload: Boolean(allowDownload),
+        watermarkText: watermarkText.trim(),
       };
 
       const res = await configureShareAsset(asset.short, payload);
@@ -212,6 +220,50 @@ const ShareConfigModal = ({ asset, isOpen, onClose, onSuccess }) => {
                   </span>
                 </div>
               </label>
+
+              <div className="p-3.5 rounded-xl border border-vault-subtle bg-vault-primary/40 space-y-3">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={allowDownload}
+                    onChange={(e) => setAllowDownload(e.target.checked)}
+                    className="mt-0.5 rounded border-vault-subtle text-indigo-600 focus:ring-0 cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-vault-main">
+                        Allow File Download
+                      </span>
+                      {!allowDownload && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                          View-Only Active
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-vault-muted block mt-0.5">
+                      {allowDownload
+                        ? "Recipients can view online and download the original file."
+                        : "Download buttons, context menus, and drag-and-drop are blocked. In-browser viewing only."}
+                    </span>
+                  </div>
+                </label>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-vault-muted mb-1 uppercase tracking-wider">
+                    Anti-Leak Watermark (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={watermarkText}
+                    onChange={(e) => setWatermarkText(e.target.value)}
+                    placeholder="e.g. CONFIDENTIAL • INTERNAL USE ONLY"
+                    className="w-full px-3 py-2 rounded-xl border border-vault-subtle bg-vault-card text-xs text-vault-main outline-none focus:border-indigo-500 transition-colors"
+                  />
+                  <span className="text-[10px] text-vault-muted mt-1 block">
+                    Stamps a repeating diagonal security overlay across images, videos, PDFs, and Office previews.
+                  </span>
+                </div>
+              </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-vault-subtle">
                 <button

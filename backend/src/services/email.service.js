@@ -18,6 +18,9 @@ const getTransporter = async () => {
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASS,
           },
+          connectionTimeout: 8000,
+          greetingTimeout: 8000,
+          socketTimeout: 10000,
         }
       : {
           host: process.env.SMTP_HOST,
@@ -30,6 +33,9 @@ const getTransporter = async () => {
           tls: {
             rejectUnauthorized: false,
           },
+          connectionTimeout: 8000,
+          greetingTimeout: 8000,
+          socketTimeout: 10000,
         };
 
     transporter = nodemailer.createTransport(transportConfig);
@@ -46,6 +52,9 @@ const getTransporter = async () => {
         user: testAccount.user,
         pass: testAccount.pass,
       },
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000,
     });
   }
 
@@ -96,18 +105,24 @@ export const sendVaultShareEmail = async ({
       </div>
     `;
 
-    const info = await mailer.sendMail({
+    const sendPromise = mailer.sendMail({
       from: `"VaultLink" <${senderAddress}>`,
       to: recipientEmail,
       subject: `VaultLink: Secure access to ${fileName || "shared asset"}`,
       html: htmlContent,
     });
 
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Email dispatch timeout (server took > 9s)")), 9000)
+    );
+
+    const info = await Promise.race([sendPromise, timeoutPromise]);
+
     const previewUrl = nodemailer.getTestMessageUrl(info);
     if (previewUrl) {
-      console.log(`\n📬 [TEST EMAIL GENERATED - Ethereal Preview URL]:\n${previewUrl}\n`);
+      console.log(`\n [TEST EMAIL GENERATED - Ethereal Preview URL]:\n${previewUrl}\n`);
     } else {
-      console.log(`\n✉️ [REAL EMAIL DISPATCHED] to ${recipientEmail} (ID: ${info.messageId})\n`);
+      console.log(`\n [REAL EMAIL DISPATCHED] to ${recipientEmail} (ID: ${info.messageId})\n`);
     }
 
     return {

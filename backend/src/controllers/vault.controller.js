@@ -228,8 +228,13 @@ export const accessVaultItem = asyncHandler(async (req, res) => {
     authorized: true,
     type: "file",
     fileName: item.file?.originalName,
+    mimeType: item.file?.mimeType,
+    size: item.file?.size,
     downloadUrl,
     cloudUrl: item.file?.cloudUrl || null,
+    allowDownload: item.allowDownload !== false,
+    watermarkText: item.watermarkText || (item.isWatermarked ? "CONFIDENTIAL" : null),
+    isWatermarked: Boolean(item.isWatermarked),
   });
 });
 
@@ -249,6 +254,10 @@ export const downloadVaultFile = asyncHandler(async (req, res) => {
 
   if (item.isPasswordProtected && item.password !== passcode) {
     throw new UnauthorizedError("Unauthorized access");
+  }
+
+  if (item.allowDownload === false) {
+    return res.status(403).json({ error: "Download is restricted for this document (View-Only Mode)" });
   }
 
   if (item.file?.cloudUrl) {
@@ -308,7 +317,7 @@ export const deleteVaultItem = asyncHandler(async (req, res) => {
 
 export const configureShareAsset = asyncHandler(async (req, res) => {
   const { shortcode } = req.params;
-  const { watermarkText, expiresInMinutes, password, requireEmail, recipientEmail } = req.body;
+  const { watermarkText, expiresInMinutes, password, requireEmail, recipientEmail, allowDownload } = req.body;
 
   const item = await VaultItem.findOne({ short: shortcode });
   if (!item) {
@@ -334,6 +343,12 @@ export const configureShareAsset = asyncHandler(async (req, res) => {
   item.expiresAt = expiresAt;
   if (requireEmail !== undefined) {
     item.requireEmail = requireEmail === "true" || requireEmail === true;
+  }
+  if (allowDownload !== undefined) {
+    item.allowDownload = allowDownload === "true" || allowDownload === true;
+  }
+  if (watermarkText !== undefined && watermarkText.trim()) {
+    item.watermarkText = watermarkText.trim();
   }
   item.isShared = true;
   if (recipientEmail) {

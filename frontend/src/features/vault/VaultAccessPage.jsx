@@ -5,14 +5,12 @@ import {
   Shield,
   Lock,
   Mail,
-  Download,
   AlertTriangle,
   Loader2,
-  ExternalLink,
   ArrowRight,
-  FileCheck2,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import VaultFileViewer from "./VaultFileViewer.jsx";
 
 const VaultAccessPage = () => {
   const { shortcode } = useParams({ strict: false });
@@ -43,6 +41,13 @@ const VaultAccessPage = () => {
           }
         }
 
+        if (data.type === "file" && !data.isPasswordProtected && !data.requireEmail) {
+          const accessRes = await axiosInstance.post(`/api/vault/${shortcode}/access`, {});
+          setAccessGranted(accessRes.data);
+          setLoading(false);
+          return;
+        }
+
         setLoading(false);
       } catch (err) {
         setLoading(false);
@@ -52,7 +57,7 @@ const VaultAccessPage = () => {
         } else if (status === 404) {
           setError("This VaultLink does not exist or has been removed.");
         } else {
-          setError(err?.response?.data?.message || err?.message || "Failed to load link");
+          setError(err?.response?.data?.message || err?.message || "Failed to load asset");
         }
       }
     };
@@ -99,7 +104,7 @@ const VaultAccessPage = () => {
               Resolving VaultLink...
             </h2>
             <p className="text-xs text-vault-muted mt-1">
-              Verifying security headers and redirecting to destination
+              Verifying security headers and governance policies
             </p>
           </div>
         </motion.div>
@@ -132,6 +137,18 @@ const VaultAccessPage = () => {
     );
   }
 
+  if (accessGranted?.type === "file") {
+    return (
+      <div className="min-h-screen bg-vault-primary flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8">
+        <VaultFileViewer
+          fileData={accessGranted}
+          viewerEmail={email}
+          shortcode={shortcode}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-vault-primary flex flex-col items-center justify-center p-4 sm:p-6 bg-grid-pattern">
       <div className="w-full max-w-lg glass-panel rounded-3xl p-6 sm:p-10 border border-vault-subtle shadow-2xl relative">
@@ -160,83 +177,63 @@ const VaultAccessPage = () => {
           </div>
         )}
 
-        {accessGranted?.type === "file" ? (
-          <div className="text-center p-6 rounded-2xl bg-vault-primary border border-vault-subtle">
-            <FileCheck2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-            <h3 className="font-heading font-bold text-lg text-vault-main">
-              Asset Unlocked Successfully
-            </h3>
-            <p className="text-xs text-vault-muted mt-1">
-              {accessGranted.fileName} is ready for download
-            </p>
-            <a
-              href={accessGranted.downloadUrl || accessGranted.cloudUrl}
-              download
-              className="mt-5 inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg shadow-emerald-500/25 transition-all"
-            >
-              <Download className="w-4 h-4" />
-              <span>Download File Now</span>
-            </a>
-          </div>
-        ) : (
-          <form onSubmit={handleUnlock} className="space-y-4">
-            {itemInfo?.requireEmail && (
-              <div>
-                <label className="block text-xs font-bold text-vault-main uppercase tracking-wider mb-1.5">
-                  Your Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-muted" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@company.com"
-                    required
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-vault-primary border border-vault-subtle text-vault-main text-sm focus:border-indigo-500 focus:outline-none transition-all"
-                  />
-                </div>
+        <form onSubmit={handleUnlock} className="space-y-4">
+          {itemInfo?.requireEmail && (
+            <div>
+              <label className="block text-xs font-bold text-vault-main uppercase tracking-wider mb-1.5">
+                Your Email Address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-muted" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@company.com"
+                  required
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-vault-primary border border-vault-subtle text-vault-main text-sm focus:border-indigo-500 focus:outline-none transition-all"
+                />
               </div>
-            )}
+            </div>
+          )}
 
-            {itemInfo?.isPasswordProtected && (
-              <div>
-                <label className="block text-xs font-bold text-vault-main uppercase tracking-wider mb-1.5">
-                  Passcode
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-muted" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter passcode"
-                    required
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-vault-primary border border-vault-subtle text-vault-main text-sm focus:border-indigo-500 focus:outline-none transition-all"
-                  />
-                </div>
+          {itemInfo?.isPasswordProtected && (
+            <div>
+              <label className="block text-xs font-bold text-vault-main uppercase tracking-wider mb-1.5">
+                Passcode
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-muted" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter passcode"
+                  required
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-vault-primary border border-vault-subtle text-vault-main text-sm focus:border-indigo-500 focus:outline-none transition-all"
+                />
               </div>
-            )}
+            </div>
+          )}
 
-            <button
-              type="submit"
-              disabled={unlocking}
-              className="w-full mt-2 py-3.5 px-4 rounded-xl bg-brand-deep text-white font-semibold text-sm shadow-xl shadow-indigo-500/25 hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
-            >
-              {unlocking ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Verifying...</span>
-                </>
-              ) : (
-                <>
-                  <span>Unlock & Access Asset</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
-        )}
+          <button
+            type="submit"
+            disabled={unlocking}
+            className="w-full mt-2 py-3.5 px-4 rounded-xl bg-brand-deep text-white font-semibold text-sm shadow-xl shadow-indigo-500/25 hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+          >
+            {unlocking ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Verifying...</span>
+              </>
+            ) : (
+              <>
+                <span>Unlock & Access Asset</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </form>
       </div>
     </div>
   );
