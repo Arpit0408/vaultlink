@@ -298,7 +298,7 @@ const CreateAssetModal = ({ isOpen, onClose, onSuccess }) => {
                   {!saveOnlyPrivate && (
                     <div>
                       <label className="block text-xs font-bold text-vault-muted mb-1 uppercase tracking-wider">
-                        Dynamic Watermark Text Overlay
+                        Watermark (Optional)
                       </label>
                       <input
                         type="text"
@@ -353,7 +353,7 @@ const CreateAssetModal = ({ isOpen, onClose, onSuccess }) => {
 
                     <div>
                       <label className="block text-xs font-bold text-vault-muted mb-1 uppercase tracking-wider">
-                        Direct Email Recipient (Optional)
+                        Recipient Email (Optional)
                       </label>
                       <input
                         type="email"
@@ -367,7 +367,7 @@ const CreateAssetModal = ({ isOpen, onClose, onSuccess }) => {
 
                   <div>
                     <label className="block text-xs font-bold text-vault-muted mb-1 uppercase tracking-wider">
-                      Custom Shortcode / Alias (Optional)
+                      Custom Shortcode (Optional)
                     </label>
                     <input
                       type="text"
@@ -387,7 +387,7 @@ const CreateAssetModal = ({ isOpen, onClose, onSuccess }) => {
                     />
                     <div className="flex flex-col">
                       <span className="text-xs font-bold text-vault-main">
-                        Require Email Gate (Lead Capture)
+                        Require Email Gate
                       </span>
                       <span className="text-[11px] text-vault-muted">
                         Visitors must submit and verify email address before downloading or viewing.

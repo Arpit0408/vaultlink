@@ -68,7 +68,7 @@ const NaturalExpiryInput = ({ valueMinutes, onChangeMinutes }) => {
       <div className="flex items-center justify-between">
         <label className="text-xs font-bold text-vault-muted uppercase tracking-wider flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-indigo-500" />
-          <span>Self-Destruct / Expiry (Chrono AI)</span>
+          <span>Expiry</span>
         </label>
         {textInput && (
           <button

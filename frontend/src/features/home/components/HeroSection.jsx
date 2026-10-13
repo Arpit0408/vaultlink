@@ -7,10 +7,10 @@ import { fadeUp, staggerContainer } from "../../../common/utils/animations.js";
 
 const HeroSection = () => {
   const { displayText } = useTypingAnimation([
-    "Dynamic Watermarking",
-    "Smart Link Vaulting",
-    "Email Lead Capture",
-    "Self-Destruct Timers",
+    "Document Watermarking",
+    "Secure Link Vaulting",
+    "Email Verification",
+    "Automatic Expiry",
   ]);
 
   return (

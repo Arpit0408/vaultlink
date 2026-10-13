@@ -124,7 +124,7 @@ const AllUrls = () => {
               Short Links
             </h1>
             <p className="text-xs text-vault-muted">
-              Shorten, protect, and track destination URLs with self-destruct timers and passcodes.
+              Shorten, protect, and track destination URLs with expiry timers and passcodes.
             </p>
           </div>
         </div>
@@ -176,7 +176,7 @@ const AllUrls = () => {
 
             <div>
               <label className="block text-xs font-bold text-vault-muted uppercase tracking-wider mb-1">
-                Custom Alias (Optional)
+                Custom Shortcode (Optional)
               </label>
               <input
                 type="text"

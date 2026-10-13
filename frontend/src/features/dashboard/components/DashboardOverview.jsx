@@ -177,7 +177,7 @@ const DashboardOverview = () => {
               Protect & Shorten Destination URL
             </h3>
             <p className="text-xs text-vault-muted max-w-sm">
-              Turn long links into brand shortcodes with optional email gate verification, passcodes, and self-destruct timers.
+              Turn long links into brand shortcodes with optional email gate verification, passcodes, and expiry timers.
             </p>
           </div>
           <ArrowUpRight className="w-4 h-4 text-vault-muted group-hover:text-purple-500 transition-colors shrink-0" />

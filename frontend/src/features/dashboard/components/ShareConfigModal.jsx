@@ -192,7 +192,7 @@ const ShareConfigModal = ({ asset, isOpen, onClose, onSuccess }) => {
 
                 <div>
                   <label className="block text-xs font-bold text-vault-muted mb-1 uppercase tracking-wider">
-                    Direct Email Recipient (Optional)
+                    Recipient Email (Optional)
                   </label>
                   <input
                     type="email"
@@ -213,7 +213,7 @@ const ShareConfigModal = ({ asset, isOpen, onClose, onSuccess }) => {
                 />
                 <div className="flex flex-col">
                   <span className="text-xs font-bold text-vault-main">
-                    Require Email Gate (Lead Capture)
+                    Require Email Gate
                   </span>
                   <span className="text-[11px] text-vault-muted">
                     Viewer must enter email address to unlock file/link.
@@ -250,7 +250,7 @@ const ShareConfigModal = ({ asset, isOpen, onClose, onSuccess }) => {
 
                 <div>
                   <label className="block text-[11px] font-bold text-vault-muted mb-1 uppercase tracking-wider">
-                    Anti-Leak Watermark (Optional)
+                    Watermark (Optional)
                   </label>
                   <input
                     type="text"

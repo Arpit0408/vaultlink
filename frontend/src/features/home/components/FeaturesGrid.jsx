@@ -19,15 +19,15 @@ const features = [
   },
   {
     icon: Clock,
-    title: "Expiring Self-Destruct Links",
+    title: "Expiring Links",
     desc: "Set time-to-live restrictions from 10 minutes to 30 days. Expired links immediately close access with automated TTL cleanup.",
     badge: "Ephemeral",
   },
   {
     icon: MailCheck,
-    title: "Email Gate & Lead Capture",
-    desc: "Turn documents into lead generation magnets. Recipients must submit their verified email before viewing or downloading.",
-    badge: "Growth Engine",
+    title: "Email Gate & Verification",
+    desc: "Require email verification before access. Recipients must submit their verified email before viewing or downloading.",
+    badge: "Verification",
   },
   {
     icon: Send,

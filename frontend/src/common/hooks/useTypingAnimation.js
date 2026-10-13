@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
 export const useTypingAnimation = (
-  words = ["Dynamic Watermarks", "Self-Destructing Links", "Email Lead Capture", "Direct Mail Delivery"],
+  words = ["Watermarking", "Expiring Links", "Email Verification", "Direct Mail Delivery"],
   typingSpeed = 80,
   deletingSpeed = 40,
   pauseDuration = 1800
