@@ -29,7 +29,7 @@ const VaultFileViewer = ({
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState(null);
   const [securityNotice, setSecurityNotice] = useState(null);
-  const [screenBlurred, setScreenBlurred] = useState(false);
+  const [isWhiteoutActive, setIsWhiteoutActive] = useState(false);
 
   const canvasRef = useRef(null);
   const pdfDocRef = useRef(null);
@@ -38,9 +38,9 @@ const VaultFileViewer = ({
   const ext = fileName.split(".").pop()?.toLowerCase() || "";
   const mime = fileData?.mimeType || "";
   const allowDownload = fileData?.allowDownload !== false;
-  const isWatermarked = fileData?.isWatermarked !== false;
+  const isWatermarked = !allowDownload || Boolean(fileData?.isWatermarked);
   const watermarkText =
-    fileData?.watermarkText || "CONFIDENTIAL • VAULTLINK GOVERNANCE";
+    fileData?.watermarkText || "CONFIDENTIAL • VIEW-ONLY VAULT";
 
   const rawUrl = fileData?.cloudUrl || fileData?.downloadUrl || "";
   const resolvedFileUrl = rawUrl.startsWith("http")
@@ -69,6 +69,22 @@ const VaultFileViewer = ({
     const handleContextMenu = (e) => {
       e.preventDefault();
       triggerSecurityAlert("Right-click context menu is restricted on this protected file.");
+    };
+
+    const handleWindowBlur = () => {
+      setIsWhiteoutActive(true);
+    };
+
+    const handleWindowFocus = () => {
+      setIsWhiteoutActive(false);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setIsWhiteoutActive(true);
+      } else {
+        setIsWhiteoutActive(false);
+      }
     };
 
     const handleKeyDown = (e) => {
@@ -103,9 +119,14 @@ const VaultFileViewer = ({
         e.preventDefault();
       }
 
-      if (e.key === "PrintScreen") {
-        setScreenBlurred(true);
-        setTimeout(() => setScreenBlurred(false), 1200);
+      if (
+        e.key === "PrintScreen" ||
+        e.keyCode === 44 ||
+        (isCmdOrCtrl && e.shiftKey && (e.key === "s" || e.key === "S"))
+      ) {
+        e.preventDefault();
+        setIsWhiteoutActive(true);
+        setTimeout(() => setIsWhiteoutActive(false), 2500);
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText("").catch(() => {});
         }
@@ -122,12 +143,18 @@ const VaultFileViewer = ({
     };
 
     window.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("dragstart", handleDragStart);
     window.addEventListener("selectstart", handleSelectStart);
 
     return () => {
       window.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("dragstart", handleDragStart);
       window.removeEventListener("selectstart", handleSelectStart);
@@ -277,11 +304,10 @@ const VaultFileViewer = ({
       <style>{`
         @media print {
           body * {
-            visibility: hidden !important;
+            display: none !important;
           }
-          body::before {
+          html::before {
             content: "CONFIDENTIAL ASSET • PRINTING RESTRICTED BY VAULTLINK GOVERNANCE";
-            visibility: visible !important;
             display: block !important;
             font-size: 20pt;
             font-weight: bold;
@@ -293,11 +319,11 @@ const VaultFileViewer = ({
       `}</style>
 
       <div
-        className={`flex flex-col rounded-3xl border border-vault-subtle bg-vault-card shadow-2xl overflow-hidden transition-all duration-300 select-none ${
+        className={`flex flex-col rounded-3xl border border-vault-subtle bg-vault-card shadow-2xl overflow-hidden transition-all duration-300 select-none relative ${
           isFullscreen
             ? "fixed inset-0 z-50 rounded-none w-screen h-screen bg-vault-primary"
             : "w-full max-w-5xl mx-auto"
-        } ${screenBlurred ? "blur-2xl opacity-10 pointer-events-none" : ""}`}
+        }`}
         onContextMenu={handlePreventContext}
         style={{
           userSelect: "none",
@@ -305,6 +331,20 @@ const VaultFileViewer = ({
           WebkitTouchCallout: "none",
         }}
       >
+        {isWhiteoutActive && !allowDownload && (
+          <div className="absolute inset-0 z-50 bg-white flex flex-col items-center justify-center p-8 text-center select-none cursor-default">
+            <div className="w-16 h-16 rounded-3xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-4 border border-amber-500/20 shadow-lg">
+              <Shield className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-heading font-black text-slate-900 tracking-tight">
+              CONFIDENTIAL DOCUMENT PROTECTED
+            </h3>
+            <p className="text-xs text-slate-600 max-w-md mt-2 font-medium">
+              Screen capture or window switch detected. Screenshots and downloads are restricted for this view-only document. Click back onto this window to resume viewing.
+            </p>
+          </div>
+        )}
+
         {securityNotice && (
           <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-bold flex items-center justify-center gap-2 shadow-md z-30 animate-pulse">
             <AlertTriangle className="w-4 h-4 shrink-0" />
